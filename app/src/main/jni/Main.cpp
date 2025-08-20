@@ -16,6 +16,7 @@ using namespace BNM::ADOFAI;
 using namespace BNM::Structures::Mono;
 using namespace BNM::Structures::Unity;
 using namespace BNM::IL2CPP;
+using namespace BNM::Defaults;
 
 #define targetLib "libil2cpp.so"
 
@@ -145,32 +146,33 @@ Color red()
 {
     return Color(1,0,0,1);
 }
+
 void (*old_OttoButtonController_Update)(UnityEngine::Object* );
 void OttoButtonController_Update(UnityEngine::Object* instance) {
-    old_OttoButtonController_Update(instance);
-    Class ADOBaseClass = Class("", "ADOBase");
+    old_OttoButtonController_Update(instance); // 先调用远函数, 类似于HarmonyLib的后置补丁
+    Class ADOBaseClass = Class("", "ADOBase"); // 获取游戏类
     Field<UnityEngine::Object*> ottoButtonField = Class("", "OttoButtonController")
-    .GetField("button");
-    Property<bool> autoPro = Class("", "RDC").GetProperty("auto");
-    Method<UnityEngine::Object*> get_controller = ADOBaseClass.GetMethod("get_controller");
-    Field<bool> gameworld = Class("", "scrController").GetField("gameworld");
-    if (get_controller.Call() != nullptr && gameworld[get_controller.Call()].Get())
+    .GetField("button"); // 获取关键字段
+    Property<bool> autoPro = Class("", "RDC").GetProperty("auto"); // 获取游戏内的属性{get;set;}
+    Method<UnityEngine::Object*> get_controller = ADOBaseClass.GetMethod("get_controller"); // 获取实例
+    Field<bool> gameworld = Class("", "scrController").GetField("gameworld"); // 获取字段
+    if (get_controller.Call() != nullptr && gameworld[get_controller.Call()].Get()) // 检测实例是否为空 && 检测是否为游玩模式（需要使用实例传递）
     {
-        UnityEngine::Object* ottoButtonObj = ottoButtonField[instance].Get();
-        Class componentClass = Class("UnityEngine", "Component");
+        UnityEngine::Object* ottoButtonObj = ottoButtonField[instance].Get(); // 反向获取UnityEngine.UI.Button实例（OttoButtonController.button）
+        Class componentClass = Class("UnityEngine", "Component"); //获取组件类
         Method<UnityEngine::Object*> getGameObject = componentClass
-        .GetMethod("get_gameObject");
-        UnityEngine::Object* gameObject = getGameObject[ottoButtonObj].Call();
-        SetActive(gameObject, true);
-        UnityEngine::Object* customLevel = callMethod<UnityEngine::Object *>("","ADOBase","get_lm");
-        Field <float> highBPM = Class("","scrLevelMaker").GetField("highestBPM");
-        Class GraphicClass = Class("UnityEngine.UI", "Graphic");
-        Class SelectableClass = Class("UnityEngine.UI", "Selectable");
-        Property<UnityEngine::Object*> image = SelectableClass.GetProperty("image");
-        UnityEngine::Object* imageObj = image[ottoButtonObj].Get();
-        Property<Color> color = GraphicClass.GetProperty("color");
-        if (autoPro.Get()) {
-                color[imageObj].Set(highBPM[customLevel].Get() >= 300 ? red() : white());
+        .GetMethod("get_gameObject"); //获取游戏对象函数
+        UnityEngine::Object* gameObject = getGameObject[ottoButtonObj].Call(); // 存储游戏对象实例（OttoButtonController.button）
+        SetActive(gameObject, true); //设置游戏活动
+        UnityEngine::Object* customLevel = callMethod<UnityEngine::Object *>("","ADOBase","get_lm"); //存储实例
+        Field <float> highBPM = Class("","scrLevelMaker").GetField("highestBPM"); // 获取字段
+        Class GraphicClass = Class("UnityEngine.UI", "Graphic"); // 获取类
+        Class SelectableClass = Class("UnityEngine.UI", "Selectable"); //获取类
+        Property<UnityEngine::Object*> image = SelectableClass.GetProperty("image"); // 获取属性
+        UnityEngine::Object* imageObj = image[ottoButtonObj].Get(); // 传递实例到image（因为是继承关系可以传递实例） 获取image的实例
+        Property<Color> color = GraphicClass.GetProperty("color"); // 获取属性
+        if (autoPro.Get()) { // 条件检测
+                color[imageObj].Set(highBPM[customLevel].Get() >= 300 ? red() : white()); // 设置颜色条件判断
             } else {
                 Color grayColor = gray();
                 Color redColor = red();
@@ -179,11 +181,25 @@ void OttoButtonController_Update(UnityEngine::Object* instance) {
                         grayColor.g * redColor.g,
                         grayColor.b * redColor.b,
                         grayColor.a * redColor.a
-                );
-                color[imageObj].Set(highBPM[customLevel].Get() >= 300 ? mixedColor : gray());
+                ); // 混合颜色
+                color[imageObj].Set(highBPM[customLevel].Get() >= 300 ? mixedColor : gray()); // 设置颜色条件判断
         }
     }
 }
+
+// 继承示意图
+//UnityEngine.Object
+//    → Component (UnityEngine.Component)
+//        → Behaviour
+//            → UIBehaviour
+//                ├→ Selectable (UnityEngine.UI.Selectable)
+//                │   └→ Button (UnityEngine.UI.Button)
+//                │
+//                └→ Graphic (UnityEngine.UI.Graphic)
+//                    ├→ Image (UnityEngine.UI.Image)
+//                    ├→ Text (UnityEngine.UI.Text)
+//                    └→ RawImage (UnityEngine.UI.RawImage)
+
 float (*old_Validate_float)(UnityEngine::Object *,float);
 float Validate_floatMet(UnityEngine::Object *instance,float value) {
     return value;
@@ -423,9 +439,76 @@ void HitboxTriggerAction(UnityEngine::Object*instance,UnityEngine::Object* plane
     orig_HitboxTriggerAction(instance, planet);
     HitboxField[instance].Set(_static);
 }
+class HookManager : public UnityEngine::MonoBehaviour {
+    // 静态钩子方法
+    static bool Hooked_get_debug() {
+        LOGI("Hooked_get_debug called");
+        
+        // 获取RDC类
+        Class rdcClass = Class("", "RDC");
+        
+        // 获取原get_auto方法
+        Method<bool> get_auto_method = rdcClass.GetMethod("get_auto");
+        
+        // 调用原方法并返回修改后的值
+        return !get_auto_method.Call();
+    }
 
+    // MonoBehaviour生命周期方法示例
+    void Hooked_Awake() {
+        
+        
+    }
+
+    void Hooked_Update() {
+        
+    }
+
+    // BNM类定义 - 继承自MonoBehaviour
+    BNM_CustomClass(HookManager,
+                    CompileTimeClassBuilder("HitMargin", "HookManager").Build(),
+                    CompileTimeClassBuilder("", "").Build(),
+                    CompileTimeClassBuilder("", "").Build());
+
+    // BNM方法定义 - 静态debug方法
+    BNM_CustomMethod(Hooked_get_debug, 
+                     true,  // 静态方法
+                     Get<bool>(),  // 返回类型
+                     "debug");  // 方法名
+
+    // BNM方法定义 - Start方法
+    BNM_CustomMethod(Hooked_Awake,
+                     false,  // 实例方法
+                     Get<void>(),  // 返回类型
+                     "Awake");  // 方法名
+
+    // BNM方法定义 - Update方法
+    BNM_CustomMethod(Hooked_Update,
+                     false,  // 实例方法
+                     Get<void>(),  // 返回类型
+                     "Update");  // 方法名
+};
+void (*orig_HookManager_Update)(UnityEngine::Object*);
+void HookManager_Update(UnityEngine::Object*instance) {
+    Class RDConstants = Class("", "RDConstants");
+    UnityEngine::Object* internalData = getFieldValue<UnityEngine::Object *>("","RDConstants","internalData"); //存储实例
+    Field<bool> debug_Bool = RDConstants.GetField("debug");
+    Field<bool> get_auto = RDConstants.GetField("auto");
+    debug_Bool[internalData].Set(!get_auto[internalData].Get());
+    orig_HookManager_Update(instance);
+}
+bool (*orig_debug)();
+bool debug() {
+    Class HookManager = Class("HitMargin", "HookManager");
+    Method<bool>HookManager_debug = HookManager.GetMethod("debug");
+    return HookManager_debug.Call();
+}
 
 void start() {
+
+    auto debug_Hook = Class("","RDC").GetMethod("get_debug");
+//    BasicHook(debug_Hook, debug, orig_debug);
+    
 /*
     Image ass = Image("Assembly-CSharp");
     auto classes = ass.GetClasses();
@@ -480,10 +563,9 @@ void start() {
     auto IsHalloweenWeek = Class("","ADOBase").GetMethod("IsHalloweenWeek");
     BasicHook(IsHalloweenWeek, IsHalloweenWeekMet,old_IsHalloweenWeek);
     auto scnLevelSelect_Start_Hook = Class("","scnLevelSelect").GetMethod("Start");
-    BasicHook(scnLevelSelect_Start_Hook,scnLevelSelect_Start,orig_scnLevelSelect_Start);
+    //BasicHook(scnLevelSelect_Start_Hook,scnLevelSelect_Start,orig_scnLevelSelect_Start);
     auto HitBox_Hook = Class("","scrDecoration").GetMethod("HitboxTriggerAction");
-    BasicHook(HitBox_Hook,HitboxTriggerAction,orig_HitboxTriggerAction);
-    
+    //BasicHook(HitBox_Hook,HitboxTriggerAction,orig_HitboxTriggerAction);
 }
     
 bool m_CachedPtr(void *unity_obj) {
