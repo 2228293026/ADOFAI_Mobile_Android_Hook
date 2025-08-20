@@ -467,7 +467,7 @@ class HookManager : public UnityEngine::MonoBehaviour {
     // BNM类定义 - 继承自MonoBehaviour
     BNM_CustomClass(HookManager,
                     CompileTimeClassBuilder("HitMargin", "HookManager").Build(),
-                    CompileTimeClassBuilder("", "").Build(),
+                    CompileTimeClassBuilder("UnityEngine", "MonoBehaviour").Build(),
                     CompileTimeClassBuilder("", "").Build());
 
     // BNM方法定义 - 静态debug方法
